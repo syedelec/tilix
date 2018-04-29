@@ -14,27 +14,6 @@ import gdk.RGBA;
 public:
 
 /**
- * Converts an RGBA structure to a 8 bit HEX string, i.e #2E3436
- *
- * Params:
- * RGBA	 = The color to convert
- * includeAlpha = Whether to include the alpha channel
- * includeHash = Whether to preface the color string with a #
- */
-string rgbaTo8bitHex(RGBA color, bool includeAlpha = false, bool includeHash = false) {
-    string prepend = includeHash ? "#" : "";
-    int red = to!(int)(color.red() * 255);
-    int green = to!(int)(color.green() * 255);
-    int blue = to!(int)(color.blue() * 255);
-    if (includeAlpha) {
-        int alpha = to!(int)(color.alpha() * 255);
-        return prepend ~ format("%02X%02X%02X%02X", red, green, blue, alpha);
-    } else {
-        return prepend ~ format("%02X%02X%02X", red, green, blue);
-    }
-}
-
-/**
  * Converts an RGBA structure to a 16 bit HEX string, i.e #2E2E34343636
  * Right now this just takes an 8 bit string and repeats each channel
  *
@@ -54,12 +33,6 @@ string rgbaTo16bitHex(RGBA color, bool includeAlpha = false, bool includeHash = 
     } else {
         return prepend ~ format("%02X%02X%02X%02X%02X%02X", red, red, green, green, blue, blue);
     }
-}
-
-RGBA getOppositeColor(RGBA rgba) {
-    RGBA result = new RGBA(1.0 - rgba.red, 1 - rgba.green, 1 - rgba.red, rgba.alpha);
-    tracef("Original: %s, New: %s", rgbaTo8bitHex(rgba, true, true), rgbaTo8bitHex(result, true, true));
-    return result;
 }
 
 void contrast(double percent, RGBA rgba, out double r, out double g, out double b) {

@@ -16,7 +16,6 @@ import gdk.RGBA;
 
 import glib.Util;
 
-import gx.gtk.color;
 import gx.gtk.util;
 import gx.i18n.l10n;
 import gx.tilix.constants;
@@ -29,6 +28,8 @@ enum SCHEME_KEY_FOREGROUND = "foreground-color";
 enum SCHEME_KEY_BACKGROUND = "background-color";
 enum SCHEME_KEY_PALETTE = "palette";
 enum SCHEME_KEY_USE_THEME_COLORS = "use-theme-colors";
+enum SCHEME_KEY_DIM_COLOR = "dim-color";
+enum SCHEME_KEY_USE_DIM_COLOR = "use-dim-color";
 enum SCHEME_KEY_USE_HIGHLIGHT_COLOR = "use-highlight-color";
 enum SCHEME_KEY_USE_CURSOR_COLOR = "use-cursor-color";
 enum SCHEME_KEY_HIGHLIGHT_FG = "highlight-foreground-color";
@@ -54,6 +55,7 @@ class ColorScheme {
     bool useThemeColors;
     bool useHighlightColor;
     bool useCursorColor;
+    bool useDimColor;
     bool useBadgeColor;
     bool useBoldColor;
     RGBA foreground;
@@ -62,6 +64,7 @@ class ColorScheme {
     RGBA highlightBG;
     RGBA cursorFG;
     RGBA cursorBG;
+    RGBA dimColor;
     RGBA badgeColor;
     RGBA boldColor;
     RGBA[16] palette;
@@ -74,6 +77,7 @@ class ColorScheme {
         highlightBG = new RGBA();
         cursorFG = new RGBA();
         cursorBG = new RGBA();
+        dimColor = new RGBA();
         badgeColor = new RGBA();
         boldColor = new RGBA();
 
@@ -114,11 +118,17 @@ class ColorScheme {
                   equal(scheme.highlightBG, this.highlightBG))) {
                 return false;
             }
-        }
-        if (useCursorColor) {
-            if (!(  equal(scheme.cursorFG, this.cursorFG) &&
-                    equal(scheme.cursorBG, this.cursorBG))) {
-                return false;
+            if (useDimColor) {
+                if (!(equal(dimColor, scheme.dimColor)))
+                    return false;
+            }
+            if (useBadgeColor) {
+                if (!(equal(badgeColor, scheme.badgeColor)))
+                    return false;
+            }
+            if (useBoldColor) {
+                if (!(equal(boldColor, scheme.boldColor)))
+                    return false;
             }
         }
         if (useBadgeColor) {
@@ -216,6 +226,9 @@ private ColorScheme loadScheme(string fileName) {
     if (SCHEME_KEY_BACKGROUND in root) {
         parseColor(cs.background, root[SCHEME_KEY_BACKGROUND].str());
     }
+    if (SCHEME_KEY_USE_DIM_COLOR in root) {
+        cs.useDimColor = root[SCHEME_KEY_USE_DIM_COLOR].type == JSON_TYPE.TRUE ? true : false;
+    }
     if (SCHEME_KEY_USE_HIGHLIGHT_COLOR in root) {
         cs.useHighlightColor = root[SCHEME_KEY_USE_HIGHLIGHT_COLOR].type == JSONType.true_;
     }
@@ -239,6 +252,9 @@ private ColorScheme loadScheme(string fileName) {
     }
     if (SCHEME_KEY_CURSOR_BG in root) {
         parseColor(cs.cursorBG, root[SCHEME_KEY_CURSOR_BG].str());
+    }
+    if (SCHEME_KEY_DIM_COLOR in root) {
+        parseColor(cs.dimColor, root[SCHEME_KEY_DIM_COLOR].str());
     }
     if (SCHEME_KEY_BADGE_FG in root) {
         parseColor(cs.badgeColor, root[SCHEME_KEY_BADGE_FG].str());
@@ -266,12 +282,14 @@ private JSONValue schemeToJson(ColorScheme scheme) {
                       SCHEME_KEY_CURSOR_FG: rgbaTo8bitHex(scheme.cursorFG, false, true),
                       SCHEME_KEY_CURSOR_BG: rgbaTo8bitHex(scheme.cursorBG, false, true),
                       SCHEME_KEY_BADGE_FG: rgbaTo8bitHex(scheme.badgeColor, false, true),
+                      SCHEME_KEY_DIM_COLOR: rgbaTo8bitHex(scheme.dimColor, false, true),
                       SCHEME_KEY_BOLD_COLOR: rgbaTo8bitHex(scheme.boldColor, false, true)
                       ];
     root[SCHEME_KEY_USE_THEME_COLORS] = JSONValue(scheme.useThemeColors);
     root[SCHEME_KEY_USE_HIGHLIGHT_COLOR] = JSONValue(scheme.useHighlightColor);
     root[SCHEME_KEY_USE_CURSOR_COLOR] = JSONValue(scheme.useCursorColor);
     root[SCHEME_KEY_USE_BADGE_COLOR] = JSONValue(scheme.useBadgeColor);
+    root[SCHEME_KEY_USE_DIM_COLOR] = JSONValue(scheme.useDimColor);
     root[SCHEME_KEY_USE_BOLD_COLOR] = JSONValue(scheme.useBoldColor);
 
     string[] palette;

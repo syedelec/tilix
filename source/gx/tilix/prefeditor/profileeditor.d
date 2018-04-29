@@ -57,7 +57,6 @@ import gtk.Version;
 import gtk.Widget;
 import gtk.Window;
 
-import gx.gtk.color;
 import gx.gtk.dialog;
 import gx.gtk.settings;
 import gx.gtk.util;
@@ -496,6 +495,8 @@ private:
     CheckButton cbUseCursorColor;
     ColorButton cbCursorFG;
     ColorButton cbCursorBG;
+    CheckButton cbUseDimColor;
+    ColorButton cbDimBG;
     CheckButton cbUseBadgeColor;
     ColorButton cbBadgeFG;
     CheckButton cbUseBoldColor;
@@ -693,6 +694,16 @@ private:
         gColors.attach(cbBoldFG, 1, row, 1, 1);
         row++;
 
+        //Dim
+        cbUseDimColor = new CheckButton(_("Dim"));
+        cbUseDimColor.addOnToggled(delegate(ToggleButton) { setCustomScheme(); });
+        bh.bind(SETTINGS_PROFILE_USE_DIM_COLOR_KEY, cbUseDimColor, "active", GSettingsBindFlags.DEFAULT);
+        gColors.attach(cbUseDimColor, 0, row, 1, 1);
+
+        cbDimBG = createColorButton(SETTINGS_PROFILE_DIM_COLOR_KEY, _("Select Dim Color"), SETTINGS_PROFILE_USE_DIM_COLOR_KEY);
+        gColors.attach(cbDimBG, 2, row, 1, 1);
+        row++;
+
         //Badge
         cbUseBadgeColor = new CheckButton(_("Badge"));
         cbUseBadgeColor.addOnToggled(delegate(ToggleButton) { setCustomScheme(); });
@@ -730,6 +741,8 @@ private:
         //Highlight Colors
         cbHighlightFG.setRgba(parseColor(gsProfile.getString(SETTINGS_PROFILE_HIGHLIGHT_FG_COLOR_KEY)));
         cbHighlightBG.setRgba(parseColor(gsProfile.getString(SETTINGS_PROFILE_HIGHLIGHT_BG_COLOR_KEY)));
+
+        cbDimBG.setRgba(parseColor(gsProfile.getString(SETTINGS_PROFILE_DIM_COLOR_KEY)));
 
         cbBoldFG.setRgba(parseColor(gsProfile.getString(SETTINGS_PROFILE_BOLD_COLOR_KEY)));
 
@@ -845,6 +858,9 @@ private:
         cbCursorFG.getRgba(scheme.cursorFG);
         cbCursorBG.getRgba(scheme.cursorBG);
 
+        scheme.useDimColor = cbUseDimColor.getActive();
+        cbDimBG.getRgba(scheme.dimColor);
+
         scheme.useBoldColor = cbUseBoldColor.getActive();
         cbBoldFG.getRgba(scheme.boldColor);
 
@@ -898,6 +914,11 @@ private:
             cbBG.setRgba(scheme.background);
             gsProfile.setString(SETTINGS_PROFILE_FG_COLOR_KEY, rgbaTo8bitHex(scheme.foreground, false, true));
             gsProfile.setString(SETTINGS_PROFILE_BG_COLOR_KEY, rgbaTo8bitHex(scheme.background, false, true));
+            //Dim colors
+            gsProfile.setBoolean(SETTINGS_PROFILE_USE_DIM_COLOR_KEY, scheme.useDimColor);
+            if (scheme.useDimColor) {
+                cbDimBG.setRgba(scheme.dimColor);
+            }
             //Bold colors
             gsProfile.setBoolean(SETTINGS_PROFILE_USE_BOLD_COLOR_KEY, scheme.useBoldColor);
             if (scheme.useBoldColor) {

@@ -2099,8 +2099,9 @@ private:
         bTitle.setStateFlags(StateFlags.ACTIVE, false);
         //Fire focus events so session can track which terminal last had focus
         onFocusIn.emit(this);
-        // Set colors for dimPercent
-        setVTEColors();
+        if (dimPercent > 0) {
+            vte.queueDraw();
+        }
     }
 
     /**
@@ -2117,17 +2118,14 @@ private:
         if (!isTerminalWidgetFocused()) {
             bTitle.unsetStateFlags(StateFlags.ACTIVE);
         }
-        // Set colors for dimPercent
-        setVTEColors();
+        if (dimPercent > 0) {
+            vte.queueDraw();
+        }
     }
 
     // Preferences go here
 private:
-
-    enum VTEColorSet {normal, dim}
-
     RGBA vteFG;
-    RGBA dimFG;
     RGBA vteBG;
     RGBA vteBGClear;
     RGBA vteHighlightFG;
@@ -2136,13 +2134,10 @@ private:
     RGBA vteCursorBG;
     RGBA vteDimBG;
     RGBA[16] vtePalette;
-    RGBA[16] dimPalette;
     RGBA vteBadge;
     RGBA vteBold;
     RGBA dimBold;
     double dimPercent;
-
-    VTEColorSet currentColorSet = VTEColorSet.normal;
 
     /**
      * CSSProvider to enhance terminal scrollbar
@@ -2156,7 +2151,6 @@ private:
 
     void initColors() {
         vteFG = new RGBA();
-        dimFG = new RGBA();
         vteBG = new RGBA();
         vteHighlightFG = new RGBA();
         vteHighlightBG = new RGBA();
@@ -2168,57 +2162,17 @@ private:
         dimBold = new RGBA();
 
         vtePalette = new RGBA[16];
-        dimPalette = new RGBA[16];
         for (int i = 0; i < 16; i++) {
             vtePalette[i] = new RGBA();
-            dimPalette[i] = new RGBA();
         }
     }
 
-    void dimColor(RGBA original, RGBA dim, double cf) {
-        double r, g, b;
-        adjustColor(cf, original, r, g, b);
-        dim.red = r;
-        dim.green = g;
-        dim.blue = b;
-        dim.alpha = original.alpha;
-    }
-
-    void updateDimColors() {
-        double cf = (vteBG.red + vteBG.green + vteBG.blue > 1.5)?dimPercent:-dimPercent;
-        dimColor(vteFG, dimFG, cf);
-        dimColor(vteBold, dimBold, cf);
-        foreach(i, color; vtePalette) {
-            dimColor(color, dimPalette[i], cf);
-        }
-    }
-
-    void setBoldColor(RGBA color) {
-        if (gsProfile.getBoolean(SETTINGS_PROFILE_USE_BOLD_COLOR_KEY)) {
-            vte.setColorBold(color);
+    void updateDimColor() {
+        if (gsProfile.getBoolean(SETTINGS_PROFILE_USE_DIM_COLOR_KEY)) {
+            vteDimBG.parse(gsProfile.getString(SETTINGS_PROFILE_DIM_COLOR_KEY));
         } else {
-            vte.setColorBold(null);
+            vteDimBG.parse(gsProfile.getString(SETTINGS_PROFILE_FG_COLOR_KEY));
         }
-    }
-
-    void setVTEColors(bool force = false) {
-        // Determine colorset needed and only set if different
-        VTEColorSet desired = (isTerminalWidgetFocused() || dimPercent == 0)? VTEColorSet.normal: VTEColorSet.dim;
-        if (desired == currentColorSet && !force) return;
-
-//        tracef("vteBGUsed: %f, %f, %f, %f", vteBG.red, vteBG.green, vteBG.blue, vteBG.alpha);
-        if (isTerminalWidgetFocused() || dimPercent == 0) {
-//            tracef("vteFG: %f, %f, %f", vteFG.red, vteFG.green, vteFG.blue);
-            vte.setColors(vteFG, vteBG, vtePalette);
-            setBoldColor(vteBold);
-            currentColorSet = VTEColorSet.normal;
-        } else {
-//            tracef("dimFG: %f, %f, %f", dimFG.red, dimFG.green, dimFG.blue);
-            vte.setColors(dimFG, vteBG, dimPalette);
-            setBoldColor(dimBold);
-            currentColorSet = VTEColorSet.dim;
-        }
-        applySecondaryColorPreferences();
     }
 
     /**
@@ -2244,7 +2198,7 @@ private:
             vte.setCursorShape(getCursorShape(gsProfile.getString(SETTINGS_PROFILE_CURSOR_SHAPE_KEY)));
             break;
         case SETTINGS_PROFILE_FG_COLOR_KEY, SETTINGS_PROFILE_BG_COLOR_KEY, SETTINGS_PROFILE_PALETTE_COLOR_KEY, SETTINGS_PROFILE_USE_THEME_COLORS_KEY,
-        SETTINGS_PROFILE_BG_TRANSPARENCY_KEY, SETTINGS_PROFILE_DIM_TRANSPARENCY_KEY:
+        SETTINGS_PROFILE_BG_TRANSPARENCY_KEY:
             if (gsProfile.getBoolean(SETTINGS_PROFILE_USE_THEME_COLORS_KEY)) {
                 getStyleColor(vte.getStyleContext(), StateFlags.ACTIVE, vteFG);
                 getStyleBackgroundColor(vte.getStyleContext(), StateFlags.ACTIVE, vteBG);
@@ -2257,13 +2211,12 @@ private:
             vteBG.alpha = to!double(100 - gsProfile.getInt(SETTINGS_PROFILE_BG_TRANSPARENCY_KEY)) / 100.0;
             string[] colors = gsProfile.getStrv(SETTINGS_PROFILE_PALETTE_COLOR_KEY);
             foreach (i, color; colors) {
-                if (!vtePalette[i].parse(color)) {
+                if (!vtePalette[i].parse(color))
                     trace("Parsing color failed " ~ colors[i]);
-                }
             }
-            dimPercent = to!double(gsProfile.getInt(SETTINGS_PROFILE_DIM_TRANSPARENCY_KEY)) / 100.0;
-            updateDimColors();
-            setVTEColors(true);
+            vte.setColors(vteFG, vteBG, vtePalette);
+            // Default Dim color depends on FG so update if necessary
+            updateDimColor();
 
             // Enhance scrollbar for supported themes, requires a theme specific css file in
             // tilix resources
@@ -2281,14 +2234,13 @@ private:
                     sb.getStyleContext().addProvider(sbProvider, ProviderPriority.APPLICATION);
                 }
             }
+            applySecondaryColorPreferences();
             break;
         case SETTINGS_PROFILE_BOLD_COLOR_KEY, SETTINGS_PROFILE_USE_BOLD_COLOR_KEY:
             string boldColor = gsProfile.getString(SETTINGS_PROFILE_BOLD_COLOR_KEY);
             if (!vteBold.parse(boldColor)) {
                 error("Parsing Bold color failed");
             }
-            updateDimColors();
-            setVTEColors(true);
             break;
         case SETTINGS_PROFILE_USE_HIGHLIGHT_COLOR_KEY, SETTINGS_PROFILE_HIGHLIGHT_FG_COLOR_KEY, SETTINGS_PROFILE_HIGHLIGHT_BG_COLOR_KEY:
             if (gsProfile.getBoolean(SETTINGS_PROFILE_USE_HIGHLIGHT_COLOR_KEY)) {
@@ -2315,6 +2267,11 @@ private:
                 }
                 vte.setColorCursor(null);
             }
+            break;
+        case SETTINGS_PROFILE_USE_DIM_COLOR_KEY, SETTINGS_PROFILE_DIM_COLOR_KEY, SETTINGS_PROFILE_DIM_TRANSPARENCY_KEY:
+            updateDimColor();
+            dimPercent = to!double(gsProfile.getInt(SETTINGS_PROFILE_DIM_TRANSPARENCY_KEY)) / 100.0;
+            vte.queueDraw();
             break;
         case SETTINGS_PROFILE_SHOW_SCROLLBAR_KEY:
             if (useOverlayScrollbar) {
@@ -2494,6 +2451,7 @@ private:
             SETTINGS_PROFILE_CJK_WIDTH_KEY, SETTINGS_PROFILE_ENCODING_KEY, SETTINGS_PROFILE_CURSOR_BLINK_MODE_KEY, //Only pass the one font key, will handle both cases
             SETTINGS_PROFILE_FONT_KEY,
             SETTINGS_TERMINAL_TITLE_STYLE_KEY, SETTINGS_AUTO_HIDE_MOUSE_KEY,
+            SETTINGS_PROFILE_USE_DIM_COLOR_KEY,
             SETTINGS_PROFILE_USE_CURSOR_COLOR_KEY,
             SETTINGS_PROFILE_USE_HIGHLIGHT_COLOR_KEY,
             SETTINGS_ALL_CUSTOM_HYPERLINK_KEY,
@@ -3620,7 +3578,6 @@ private:
 
     //Draw the drag hint if dragging is occurring
     bool onVTEDraw(Scoped!Context cr, Widget widget) {
-        /*
         if (dimPercent > 0) {
             Window window = cast(Window) getToplevel();
             bool windowActive = (window is null)?false:window.isActive();
@@ -3630,7 +3587,6 @@ private:
                 cr.paint();
             }
         }
-        */
         //Dragging happening?
         if (!dragInfo.isDragActive)
             return false;
