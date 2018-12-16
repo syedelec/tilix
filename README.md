@@ -110,3 +110,8 @@ and then execute it:
 ```
 sudo sh uninstall.sh
 ```
+
+#### This fork
+
+Features :
+ * Brings back the old dim feature (not by font)
